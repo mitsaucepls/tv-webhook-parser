@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tv-webhook-parser
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tv-webhook-parser
+  template:
+    metadata:
+      labels:
+        app: tv-webhook-parser
+    spec:
+      containers:
+        - name: tv-webhook-parser
+          image: localhost/tv-webhook-parser:latest
+          imagePullPolicy: Never
+          env:
+            - name: SIGNAL_PATH
+              value: /signals
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: signal-storage
+              mountPath: /signals
+      volumes:
+        - name: signal-storage
+          hostPath:
+            path: "/tmp"
+            type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tv-webhook-parser-service
+spec:
+  selector:
+    app: tv-webhook-parser
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tv-webhook-parser-ingress
+  annotations:
+    tailscale.com/hostname: tv-webhook-parser
+    tailscale.com/funnel: "true"
+    tailscale.com/tags: tag:k8s-funnel
+spec:
+  defaultBackend:
+    service:
+      name: tv-webhook-parser-service
+      port:
+        number: 8080
+  ingressClassName: tailscale
+  tls:
+    - hosts:
+        - tv-webhook-parser
